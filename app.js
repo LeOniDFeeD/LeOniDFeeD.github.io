@@ -20,7 +20,7 @@ async function init() {
   updateTotalBar();
 }
 
-// ✅ ИСПРАВЛЕНО: локальный формат даты (без UTC)
+// ✅ Правильный формат даты (локальный)
 function formatDate(date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -111,7 +111,8 @@ function renderCalendar() {
     dayEl.textContent = date.getDate();
 
     if (isCurrentMonth) {
-      dayEl.onclick = () => openDayModal(dateStr);
+      // ✅ Клик работает напрямую
+      dayEl.addEventListener('click', () => openDayModal(dateStr));
       
       if (dotsCount > 0) {
         const dots = document.createElement('div');
@@ -149,6 +150,17 @@ function nextMonth() {
   }
   renderCalendar();
   updateTotalBar();
+}
+
+// ✅ Универсальная функция открытия модалки
+function openModal(htmlContent) {
+  document.getElementById('modal-content').innerHTML = htmlContent;
+  const modal = document.getElementById('modal');
+  modal.style.display = 'flex';
+  // Небольшая задержка для запуска анимации
+  setTimeout(() => {
+    modal.classList.add('active');
+  }, 10);
 }
 
 function openDayModal(dateStr) {
@@ -220,10 +232,7 @@ function openDayModal(dateStr) {
     <button onclick="closeModal()">Закрыть</button>
   `;
 
-  document.getElementById('modal-content').innerHTML = html;
-  const modal = document.getElementById('modal');
-  modal.style.display = 'flex';
-  setTimeout(() => modal.classList.add('active'), 10);
+  openModal(html);
 }
 
 function saveRecord(dateStr) {
@@ -282,10 +291,7 @@ function editRecord(dateStr, index) {
     <button onclick="openDayModal('${dateStr}')">Отмена</button>
   `;
 
-  document.getElementById('modal-content').innerHTML = html;
-  const modal = document.getElementById('modal');
-  modal.style.display = 'flex';
-  setTimeout(() => modal.classList.add('active'), 10);
+  openModal(html);
 }
 
 function saveEditedRecord(dateStr, index) {
@@ -376,10 +382,7 @@ function openClients() {
     </div>
   `;
 
-  document.getElementById('modal-content').innerHTML = html;
-  const modal = document.getElementById('modal');
-  modal.style.display = 'flex';
-  setTimeout(() => modal.classList.add('active'), 10);
+  openModal(html);
 }
 
 async function addClient() {
@@ -417,10 +420,7 @@ async function editClient(id) {
     <button onclick="openClients()">Отмена</button>
   `;
 
-  document.getElementById('modal-content').innerHTML = html;
-  const modal = document.getElementById('modal');
-  modal.style.display = 'flex';
-  setTimeout(() => modal.classList.add('active'), 10);
+  openModal(html);
 }
 
 async function saveEditedClient(id) {
@@ -507,10 +507,7 @@ function openServices() {
     </div>
   `;
 
-  document.getElementById('modal-content').innerHTML = html;
-  const modal = document.getElementById('modal');
-  modal.style.display = 'flex';
-  setTimeout(() => modal.classList.add('active'), 10);
+  openModal(html);
 }
 
 async function addService() {
@@ -543,10 +540,7 @@ async function editService(id) {
     <button onclick="openServices()">Отмена</button>
   `;
 
-  document.getElementById('modal-content').innerHTML = html;
-  const modal = document.getElementById('modal');
-  modal.style.display = 'flex';
-  setTimeout(() => modal.classList.add('active'), 10);
+  openModal(html);
 }
 
 async function saveEditedService(id) {
@@ -670,18 +664,17 @@ function openStats() {
 
   html += `<button onclick="closeModal()">Закрыть</button>`;
 
-  document.getElementById('modal-content').innerHTML = html;
-  const modal = document.getElementById('modal');
-  modal.style.display = 'flex';
-  setTimeout(() => modal.classList.add('active'), 10);
+  openModal(html);
 }
 
-// ✅ ЗАКРЫТИЕ МОДАЛКИ С АНИМАЦИЕЙ
+// ✅ Безопасное закрытие
 function closeModal(e) {
-  if (e && e.target !== document.getElementById('modal')) return;
   const modal = document.getElementById('modal');
+  if (e && e.target !== modal) return;
   modal.classList.remove('active');
-  setTimeout(() => modal.style.display = 'none', 300);
+  setTimeout(() => {
+    modal.style.display = 'none';
+  }, 300);
 }
 
 function updateTotalBar() {
