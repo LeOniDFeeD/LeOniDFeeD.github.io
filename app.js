@@ -20,12 +20,14 @@ async function init() {
   updateTotalBar();
 }
 
+// ✅ ИСПРАВЛЕНО: локальный формат даты (без UTC)
 function formatDate(date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
+
 function getServiceById(id) {
   return services.find(s => s.id === id) || { name: '—', price: 0 };
 }
@@ -66,10 +68,9 @@ function sortClients() {
   });
 }
 
-// Сортировка записей по времени
 function sortRecordsByTime(records) {
   return records.sort((a, b) => {
-    const timeA = a.time || '99:99'; // позже всех
+    const timeA = a.time || '99:99';
     const timeB = b.time || '99:99';
     return timeA.localeCompare(timeB);
   });
@@ -93,7 +94,7 @@ function renderCalendar() {
   const today = new Date();
   const todayStr = formatDate(today);
 
-  for ( let i = 0; i < 42; i++ ) {
+  for (let i = 0; i < 42; i++) {
     const date = new Date(startDate);
     date.setDate(startDate.getDate() + i);
     const dateStr = formatDate(date);
@@ -152,7 +153,7 @@ function nextMonth() {
 
 function openDayModal(dateStr) {
   let dayRecords = records.filter(r => r.date === dateStr);
-  dayRecords = sortRecordsByTime([...dayRecords]); // сортируем по времени
+  dayRecords = sortRecordsByTime([...dayRecords]);
 
   const dateObj = new Date(dateStr);
   const formattedDate = `${dateObj.getDate()} ${monthNames[dateObj.getMonth()]}`;
@@ -220,7 +221,9 @@ function openDayModal(dateStr) {
   `;
 
   document.getElementById('modal-content').innerHTML = html;
-  document.getElementById('modal').style.display = 'flex';
+  const modal = document.getElementById('modal');
+  modal.style.display = 'flex';
+  setTimeout(() => modal.classList.add('active'), 10);
 }
 
 function saveRecord(dateStr) {
@@ -249,8 +252,9 @@ function saveRecord(dateStr) {
 
 // === РЕДАКТИРОВАНИЕ ЗАПИСИ ===
 function editRecord(dateStr, index) {
-  const record = records.filter(r => r.date === dateStr)[index];
-  if (!record) return;
+  const dayRecords = records.filter(r => r.date === dateStr);
+  if (index >= dayRecords.length) return;
+  const record = dayRecords[index];
 
   sortServices();
   sortClients();
@@ -279,6 +283,9 @@ function editRecord(dateStr, index) {
   `;
 
   document.getElementById('modal-content').innerHTML = html;
+  const modal = document.getElementById('modal');
+  modal.style.display = 'flex';
+  setTimeout(() => modal.classList.add('active'), 10);
 }
 
 function saveEditedRecord(dateStr, index) {
@@ -292,34 +299,24 @@ function saveEditedRecord(dateStr, index) {
     return;
   }
 
-  // Найдём нужную запись (учитываем, что список мог измениться)
   const dayRecords = records.filter(r => r.date === dateStr);
   if (index >= dayRecords.length) return;
 
-  // Обновим данные
-  const originalIndex = records.findIndex(r => 
-    r.date === dateStr && 
-    r.clientId === dayRecords[index].clientId &&
-    r.serviceId === dayRecords[index].serviceId &&
-    r.time === dayRecords[index].time
+  const target = dayRecords[index];
+  records = records.filter(r => 
+    !(r.date === dateStr && 
+      r.clientId === target.clientId && 
+      r.serviceId === target.serviceId && 
+      r.time === target.time)
   );
 
-  if (originalIndex === -1) return;
-
-  records[originalIndex] = {
-    date: dateStr,
-    clientId,
-    serviceId,
-    time,
-    comment
-  };
+  records.push({ date: dateStr, clientId, serviceId, time, comment });
 
   localforage.setItem('records', records);
   showNotification('Запись обновлена!');
   openDayModal(dateStr);
 }
 
-// === УДАЛЕНИЕ ЗАПИСИ ===
 function deleteRecord(dateStr, index) {
   if (!confirm('Удалить запись?')) return;
 
@@ -339,7 +336,7 @@ function deleteRecord(dateStr, index) {
   openDayModal(dateStr);
 }
 
-// === КЛИЕНТЫ === (без изменений, но оставлены для полноты)
+// === КЛИЕНТЫ ===
 function openClients() {
   sortClients();
   let listHtml = '';
@@ -380,6 +377,9 @@ function openClients() {
   `;
 
   document.getElementById('modal-content').innerHTML = html;
+  const modal = document.getElementById('modal');
+  modal.style.display = 'flex';
+  setTimeout(() => modal.classList.add('active'), 10);
 }
 
 async function addClient() {
@@ -418,6 +418,9 @@ async function editClient(id) {
   `;
 
   document.getElementById('modal-content').innerHTML = html;
+  const modal = document.getElementById('modal');
+  modal.style.display = 'flex';
+  setTimeout(() => modal.classList.add('active'), 10);
 }
 
 async function saveEditedClient(id) {
@@ -465,7 +468,7 @@ async function deleteSelectedClients() {
   openClients();
 }
 
-// === УСЛУГИ === (аналогично)
+// === УСЛУГИ ===
 function openServices() {
   sortServices();
   let listHtml = '';
@@ -505,6 +508,9 @@ function openServices() {
   `;
 
   document.getElementById('modal-content').innerHTML = html;
+  const modal = document.getElementById('modal');
+  modal.style.display = 'flex';
+  setTimeout(() => modal.classList.add('active'), 10);
 }
 
 async function addService() {
@@ -538,6 +544,9 @@ async function editService(id) {
   `;
 
   document.getElementById('modal-content').innerHTML = html;
+  const modal = document.getElementById('modal');
+  modal.style.display = 'flex';
+  setTimeout(() => modal.classList.add('active'), 10);
 }
 
 async function saveEditedService(id) {
@@ -662,11 +671,17 @@ function openStats() {
   html += `<button onclick="closeModal()">Закрыть</button>`;
 
   document.getElementById('modal-content').innerHTML = html;
+  const modal = document.getElementById('modal');
+  modal.style.display = 'flex';
+  setTimeout(() => modal.classList.add('active'), 10);
 }
 
+// ✅ ЗАКРЫТИЕ МОДАЛКИ С АНИМАЦИЕЙ
 function closeModal(e) {
   if (e && e.target !== document.getElementById('modal')) return;
-  document.getElementById('modal').style.display = 'none';
+  const modal = document.getElementById('modal');
+  modal.classList.remove('active');
+  setTimeout(() => modal.style.display = 'none', 300);
 }
 
 function updateTotalBar() {
