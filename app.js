@@ -42,9 +42,11 @@ async function saveClients() {
 
 function showNotification(text = 'Сохранено!') {
   const el = document.getElementById('notification');
-  el.textContent = text;
-  el.style.display = 'block';
-  setTimeout(() => el.style.display = 'none', 2000);
+  if (el) {
+    el.textContent = text;
+    el.style.display = 'block';
+    setTimeout(() => el.style.display = 'none', 2000);
+  }
 }
 
 function sortServices() {
@@ -59,6 +61,15 @@ function sortServices() {
 function sortClients() {
   clients.sort((a, b) => {
     return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName);
+  });
+}
+
+// Сортировка записей по времени
+function sortRecordsByTime(records) {
+  return records.sort((a, b) => {
+    const timeA = a.time || '99:99'; // позже всех
+    const timeB = b.time || '99:99';
+    return timeA.localeCompare(timeB);
   });
 }
 
@@ -138,11 +149,12 @@ function nextMonth() {
 }
 
 function openDayModal(dateStr) {
-  const dayRecords = records.filter(r => r.date === dateStr);
+  let dayRecords = records.filter(r => r.date === dateStr);
+  dayRecords = sortRecordsByTime([...dayRecords]); // сортируем по времени
+
   const dateObj = new Date(dateStr);
   const formattedDate = `${dateObj.getDate()} ${monthNames[dateObj.getMonth()]}`;
 
-  // Доход за день
   const dayIncome = dayRecords.reduce((sum, r) => {
     const service = getServiceById(r.serviceId);
     return sum + service.price;
@@ -153,7 +165,7 @@ function openDayModal(dateStr) {
 
   if (dayRecords.length > 0) {
     html += '<h4>Записи:</h4>';
-    dayRecords.forEach(r => {
+    dayRecords.forEach((r, idx) => {
       const client = getClientById(r.clientId);
       const service = getServiceById(r.serviceId);
       const time = r.time || '—';
@@ -165,6 +177,10 @@ function openDayModal(dateStr) {
           Сумма: ${service.price} ₽<br>
           Время: ${time}<br>
           ${r.comment ? `<small>${r.comment}</small>` : ''}
+          <div style="margin-top:6px;">
+            <button onclick="editRecord('${r.date}', ${idx})" style="background:#ff9500;padding:4px 8px;font-size:14px;margin-right:6px;">✏️</button>
+            <button onclick="deleteRecord('${r.date}', ${idx})" style="background:#ff3b30;padding:4px 8px;font-size:14px;">🗑</button>
+          </div>
         </div>
       `;
     });
@@ -216,7 +232,6 @@ function saveRecord(dateStr) {
     return;
   }
 
-  // Увеличиваем счётчик использования услуги
   const service = services.find(s => s.id === serviceId);
   if (service) {
     service.usageCount = (service.usageCount || 0) + 1;
@@ -230,7 +245,99 @@ function saveRecord(dateStr) {
   updateTotalBar();
 }
 
-// === КЛИЕНТЫ ===
+// === РЕДАКТИРОВАНИЕ ЗАПИСИ ===
+function editRecord(dateStr, index) {
+  const record = records.filter(r => r.date === dateStr)[index];
+  if (!record) return;
+
+  sortServices();
+  sortClients();
+
+  let serviceOptions = services.map(s => 
+    `<option value="${s.id}" ${s.id === record.serviceId ? 'selected' : ''}>${s.name} (${s.price} ₽)</option>`
+  ).join('');
+
+  let clientOptions = clients.map(c => {
+    const name = `${c.firstName} ${c.lastName}`.trim();
+    return `<option value="${c.id}" ${c.id === record.clientId ? 'selected' : ''}>${name} ${c.phone ? '(' + c.phone + ')' : ''}</option>`;
+  }).join('');
+
+  let html = `
+    <h3>✏️ Редактировать запись</h3>
+    <select id="edit-client-id">
+      ${clientOptions}
+    </select>
+    <select id="edit-service-id">
+      ${serviceOptions}
+    </select>
+    <input type="time" id="edit-time" value="${record.time || ''}" />
+    <textarea id="edit-comment" placeholder="Комментарий">${record.comment || ''}</textarea>
+    <button onclick="saveEditedRecord('${dateStr}', ${index})">Сохранить</button>
+    <button onclick="openDayModal('${dateStr}')">Отмена</button>
+  `;
+
+  document.getElementById('modal-content').innerHTML = html;
+}
+
+function saveEditedRecord(dateStr, index) {
+  const clientId = document.getElementById('edit-client-id').value;
+  const serviceId = document.getElementById('edit-service-id').value;
+  const time = document.getElementById('edit-time').value || null;
+  const comment = document.getElementById('edit-comment').value.trim();
+
+  if (!clientId || !serviceId) {
+    alert('Выберите клиента и услугу');
+    return;
+  }
+
+  // Найдём нужную запись (учитываем, что список мог измениться)
+  const dayRecords = records.filter(r => r.date === dateStr);
+  if (index >= dayRecords.length) return;
+
+  // Обновим данные
+  const originalIndex = records.findIndex(r => 
+    r.date === dateStr && 
+    r.clientId === dayRecords[index].clientId &&
+    r.serviceId === dayRecords[index].serviceId &&
+    r.time === dayRecords[index].time
+  );
+
+  if (originalIndex === -1) return;
+
+  records[originalIndex] = {
+    date: dateStr,
+    clientId,
+    serviceId,
+    time,
+    comment
+  };
+
+  localforage.setItem('records', records);
+  showNotification('Запись обновлена!');
+  openDayModal(dateStr);
+}
+
+// === УДАЛЕНИЕ ЗАПИСИ ===
+function deleteRecord(dateStr, index) {
+  if (!confirm('Удалить запись?')) return;
+
+  const dayRecords = records.filter(r => r.date === dateStr);
+  if (index >= dayRecords.length) return;
+
+  const target = dayRecords[index];
+  records = records.filter(r => 
+    !(r.date === dateStr && 
+      r.clientId === target.clientId && 
+      r.serviceId === target.serviceId && 
+      r.time === target.time)
+  );
+
+  localforage.setItem('records', records);
+  showNotification('Запись удалена!');
+  openDayModal(dateStr);
+}
+
+// === КЛИЕНТЫ === (без изменений, но оставлены для полноты)
 function openClients() {
   sortClients();
   let listHtml = '';
@@ -292,7 +399,7 @@ async function addClient() {
   clients.push(newClient);
   await saveClients();
   showNotification('Клиент сохранён!');
-  openClients(); // остаёмся в том же окне
+  openClients();
 }
 
 async function editClient(id) {
@@ -356,7 +463,7 @@ async function deleteSelectedClients() {
   openClients();
 }
 
-// === УСЛУГИ === (обновлённая версия с уведомлением)
+// === УСЛУГИ === (аналогично)
 function openServices() {
   sortServices();
   let listHtml = '';
